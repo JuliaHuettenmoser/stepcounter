@@ -1,20 +1,59 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import * as React from 'react';
+import {StyleSheet, Text, View, TouchableOpacity, SafeAreaView} from "react-native";
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
-export default function App() {
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import Feather from 'react-native-vector-icons/Feather';
+import FontAwesome5 from 'react-native-vector-icons/FontAwesome5'
+
+import HomeScreen from './screens/home';
+import CounterScreen from './screens/counter';
+import SettingsScreen from './screens/settings';
+
+import { DarkModeProvider } from './components/darkModeContext';
+import Settings from './screens/settings';
+
+const Tab = createBottomTabNavigator();
+
+function MyTabs() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <DarkModeProvider>
+    <Tab.Navigator 
+    initialRouteName='Home' 
+    screenOptions={({route}) => ({
+      tabBarIcon: ({focused, color, size}) => {
+        let iconName;
+
+        if (route.name === 'Home') {
+          iconName = focused ? "footsteps" : "footsteps-outline";
+        } else if (route.name === 'Counter') {
+          iconName = focused ? "running" : "running";
+        } else if (route.name === 'Settings') {
+          iconName = focused ? "settings" : "settings-outline";
+        }
+
+        if (iconName === 'settings') {
+          return <Ionicons name={iconName} size={size} color={color} />;
+        } else if (iconName === "running") {
+          return <FontAwesome5 name={iconName} size={size} color={color} />;
+        } else {
+          return <Ionicons name={iconName} size={size} color={color} />;
+        }
+      },
+    })}>
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Counter" component={CounterScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+    </DarkModeProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  return (
+    <NavigationContainer>
+      <MyTabs />
+    </NavigationContainer>
+  );
+}
