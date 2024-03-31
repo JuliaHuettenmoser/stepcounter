@@ -1,37 +1,45 @@
-// Counter.js
 import React, { useState, useEffect } from 'react';
-import { Text, View, StyleSheet, SafeAreaView } from 'react-native';
+import { Text, View, StyleSheet, SafeAreaView, Button } from 'react-native';
 import { Accelerometer } from 'expo-sensors';
 import * as FileSystem from 'expo-file-system';
 import { format, startOfWeek } from 'date-fns';
-import { useDarkMode } from '../components/darkModeContext'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import "firebase/database";
 
-const STEPS_DATA_FILE_URI = FileSystem.documentDirectory + 'stepsData.json';
+import { useDarkMode } from '../components/darkModeContext';
 
-const getCurrentWeekStart = () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+const STEPS_DATA_FILE_URI = '../stepsData.json';
 
-async function saveStepsToStorage(steps) {
-  const currentDate = format(new Date(), 'yyyy-MM-dd');
-  const weekStart = getCurrentWeekStart();
+async function ensureDirExists(dirPath) {
+  const dirInfo = await FileSystem.getInfoAsync(dirPath);
+  if (!dirInfo.exists) {
+    console.log("Directory doesn't exist, creating...");
+    await FileSystem.makeDirectoryAsync(dirPath, { intermediates: true });
+  }
+}
+
+async function saveStepsToStorage(currentDate, steps) {
   try {
-    let stepsData = [];
     const fileInfo = await FileSystem.getInfoAsync(STEPS_DATA_FILE_URI);
-    if (fileInfo.exists) {
-      const existingData = await FileSystem.readAsStringAsync(STEPS_DATA_FILE_URI);
-      stepsData = JSON.parse(existingData);
+    let stepsData = fileInfo.exists ? JSON.parse(await FileSystem.readAsStringAsync(STEPS_DATA_FILE_URI)) : [];
+
+    if (!Array.isArray(stepsData)) {
+      stepsData = [];
     }
 
-    let currentWeek = stepsData.find(week => week.weekStart === weekStart);
-    if (!currentWeek) {
-      currentWeek = { weekStart, days: {} };
-      stepsData.push(currentWeek);
+    let currentDay = stepsData.find(day => day.date === currentDate);
+    if (!currentDay) {
+      currentDay = { date: currentDate, steps: 0 };
+      stepsData.push(currentDay);
     }
 
-    currentWeek.days[currentDate] = steps;
+    currentDay.steps += steps;
 
-    await FileSystem.writeAsStringAsync(STEPS_DATA_FILE_URI, JSON.stringify(stepsData));
+    await FileSystem.writeAsStringAsync(STEPS_DATA_FILE_URI, JSON.stringify(stepsData, null, 2));
+    console.log('Steps data saved successfully!');
+
   } catch (error) {
-    console.error('Error saving steps to file:', error);
+    console.error('Error writing steps data to file:', error);
   }
 }
 
@@ -43,26 +51,30 @@ export default function StepCounter() {
     let lastReadingTimestamp = 0;
     const subscription = Accelerometer.addListener(accelerometerData => {
       const now = Date.now();
-      if (now - lastReadingTimestamp >= 1000 && Math.abs(accelerometerData.x) > 0.5) {
+      if (now - lastReadingTimestamp >= 500 && Math.abs(accelerometerData.x) > 0.5) {
         lastReadingTimestamp = now;
         setSteps(prev => prev + 1);
       }
     });
 
-    Accelerometer.setUpdateInterval(1000);
+    Accelerometer.setUpdateInterval(500);
 
     return () => subscription.remove();
   }, []);
 
-  useEffect(() => {
-    saveStepsToStorage(steps);
-  }, [steps]);
+  const handleSaveSteps = () => {
+    const currentDate = format(new Date(), 'yyyy-MM-dd');
+    saveStepsToStorage(currentDate, steps);
+    alert('Steps saved successfully!');
+  };
 
   const dynamicStyles = getStyles(isDarkMode);
 
   return (
     <SafeAreaView style={dynamicStyles.container}>
       <Text style={dynamicStyles.text}>Steps: {steps}</Text>
+      <Text style={dynamicStyles.text}>Burnt calories: {steps * 0.04}</Text>
+      <Button title="Save Today's Steps Now" onPress={handleSaveSteps} />
     </SafeAreaView>
   );
 }
@@ -77,5 +89,6 @@ const getStyles = (isDarkMode) => StyleSheet.create({
   text: {
     fontSize: 20,
     color: isDarkMode ? '#FFFFFF' : '#121212',
+    marginBottom: 20
   }
 });
